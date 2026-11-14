@@ -1,0 +1,78 @@
+name: Publish checked Windows installer (manual)
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_url:
+        description: Temporary URL of the checked installer artifact (not source code)
+        required: true
+        type: string
+      sha256:
+        description: Expected installer SHA-256 verified by the release owner
+        required: true
+        type: string
+      release_tag:
+        description: Existing draft prerelease tag
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download only the checked installer artifact
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const inputs = context.payload.inputs;
+            const url = inputs.artifact_url;
+            core.setSecret(url);
+            const parsed = new URL(url);
+            if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.blob.core.windows.net')) {
+              throw new Error('Expected a GitHub Actions Azure artifact URL');
+            }
+            if (!/^[a-f0-9]{64}$/.test(inputs.sha256)) throw new Error('Invalid SHA-256');
+            if (!/^windows-v[0-9][a-zA-Z0-9.-]+$/.test(inputs.release_tag)) throw new Error('Invalid tag');
+            const response = await fetch(url, {redirect: 'error'});
+            if (!response.ok) throw new Error(`Artifact download HTTP ${response.status}`);
+            const data = Buffer.from(await response.arrayBuffer());
+            if (data.length > 200 * 1024 * 1024) throw new Error('Artifact too large');
+            require('fs').writeFileSync(process.env.RUNNER_TEMP + '/installer.zip', data);
+            core.exportVariable('EXPECTED_SHA256', inputs.sha256);
+            core.exportVariable('RELEASE_TAG', inputs.release_tag);
+      - name: Validate archive and installer checksum
+        shell: python
+        run: |
+          import hashlib, os, re, stat, zipfile
+          from pathlib import Path
+          with zipfile.ZipFile(Path(os.environ['RUNNER_TEMP']) / 'installer.zip') as archive:
+              entries = archive.infolist()
+              assert len(entries) == 2, 'Only installer and SHA-256 are permitted'
+              for entry in entries:
+                  assert '/' not in entry.filename and chr(92) not in entry.filename
+                  assert entry.file_size < 200 * 1024 * 1024
+                  assert not stat.S_ISLNK(entry.external_attr >> 16)
+              exe = next(entry for entry in entries if re.fullmatch(r'Administrator-[0-9A-Za-z.-]+-windows-x64-test\.[0-9]+-setup\.exe', entry.filename))
+              checksum = next(entry for entry in entries if entry.filename == exe.filename + '.sha256')
+              data = archive.read(exe)
+              assert data.startswith(b'MZ'), 'Not a Windows executable'
+              actual = hashlib.sha256(data).hexdigest()
+              assert actual == os.environ['EXPECTED_SHA256']
+              fields = archive.read(checksum).decode('utf-8').split()
+              assert fields == [actual, exe.filename], 'Invalid checksum file'
+              output = Path('dist')
+              output.mkdir()
+              (output / exe.filename).write_bytes(data)
+              (output / checksum.filename).write_bytes(archive.read(checksum))
+          print('PASS installer archive and SHA-256')
+      - name: Upload to existing draft and publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          draft="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
+          test "$draft" = true
+          gh release upload "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY"
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease
+          echo "Published $RELEASE_TAG with checked installer and SHA-256" >> "$GITHUB_STEP_SUMMARY"
