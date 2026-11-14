@@ -1,5 +1,10 @@
 # Administrator — дистрибутивы
 
+**Тестовая версия для Windows: 1.0.10-rc.1 / test.1.**
+
+[Скачать установщик Windows x64](https://github.com/dbzubov/administrator-releases/releases/download/windows-v1.0.10-rc.1-test.1/Administrator-1.0.10-rc.1-windows-x64-test.1-setup.exe) · [Описание релиза и SHA-256](https://github.com/dbzubov/administrator-releases/releases/tag/windows-v1.0.10-rc.1-test.1) · [Все версии](https://github.com/dbzubov/administrator-releases/releases)
+
+
 Локальное приложение для работы с проектами, задачами, материалами,
 встречами и рабочими документами.
 
