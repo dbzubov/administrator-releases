@@ -1,0 +1,31 @@
+name: Release planning assistant
+on:
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled, deleted]
+  issue_comment:
+    types: [created, edited, deleted]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: administrator-release-plan
+  cancel-in-progress: false
+jobs:
+  plan:
+    if: >-
+      github.event.issue.pull_request == null &&
+      !(github.event_name == 'issues' && github.event.issue.number == 1) &&
+      (github.event_name != 'issue_comment' || !endsWith(github.actor, '[bot]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Update managed plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLAN_ISSUE_NUMBER: '1'
+        run: python3 .github/scripts/release_planner.py
