@@ -1,0 +1,41 @@
+name: Ошибка в Administrator
+description: Сообщить о проблеме в тестовой версии
+title: "[Windows] "
+body:
+  - type: markdown
+    attributes:
+      value: "Не прикладывайте API-ключи, пароли и конфиденциальные материалы. Обращение публичное."
+  - type: input
+    id: version
+    attributes:
+      label: Версия Administrator
+      placeholder: 1.0.10-rc.1 / Windows test.1
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Версия и сборка Windows
+      description: Можно посмотреть командой winver.
+      placeholder: Windows 11, 24H2, сборка ...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      description: Какие действия привели к ошибке? Укажите включён ли VPN.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемый результат
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Фактический результат, текст ошибки и скриншот
+    validations:
+      required: true
